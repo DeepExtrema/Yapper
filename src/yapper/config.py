@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import logging
+import os
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+log = logging.getLogger(__name__)
+
 
 def _config_path() -> Path:
-    xdg = Path.home() / ".config"
+    xdg = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
     return xdg / "yapper" / "config.toml"
 
 
@@ -94,21 +98,22 @@ class Config:
     def socket_path(self) -> Path:
         if self.daemon.socket_path:
             return Path(self.daemon.socket_path)
-        import os
         runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
         return Path(runtime_dir) / "yapper.sock"
 
 
 def _apply_dict(obj: object, data: dict) -> None:
     for key, value in data.items():
-        if hasattr(obj, key):
-            current = getattr(obj, key)
-            if isinstance(current, (AudioConfig, TranscriberConfig, ProcessorConfig,
-                                    InjectorConfig, NotificationConfig, DaemonConfig,
-                                    DictionaryConfig, StreamingConfig)) and isinstance(value, dict):
-                _apply_dict(current, value)
-            else:
-                setattr(obj, key, value)
+        if not hasattr(obj, key):
+            log.warning("Unknown config key ignored: %s", key)
+            continue
+        current = getattr(obj, key)
+        if isinstance(current, (AudioConfig, TranscriberConfig, ProcessorConfig,
+                                InjectorConfig, NotificationConfig, DaemonConfig,
+                                DictionaryConfig, StreamingConfig)) and isinstance(value, dict):
+            _apply_dict(current, value)
+        else:
+            setattr(obj, key, value)
 
 
 def load_config(path: Path | None = None) -> Config:

@@ -42,8 +42,9 @@ class YapperDaemon:
 
         # Streaming mode state
         self._vad = None
-        self._segment_queue: asyncio.Queue[np.ndarray | None] = asyncio.Queue(maxsize=10)
+        self._segment_queue: asyncio.Queue[np.ndarray] = asyncio.Queue(maxsize=10)
         self._segment_worker_task: asyncio.Task | None = None
+        self._stop_event = asyncio.Event()
 
     async def _handle_command(self, command: str) -> str:
         now = time.monotonic()
@@ -67,7 +68,7 @@ class YapperDaemon:
                     state = "processing"
                 return state
             case "quit":
-                asyncio.get_event_loop().call_soon(
+                asyncio.get_running_loop().call_soon(
                     lambda: asyncio.ensure_future(self._shutdown())
                 )
                 return "shutting down"
@@ -80,9 +81,10 @@ class YapperDaemon:
         if self._processing:
             return "busy processing"
 
+        loop = asyncio.get_running_loop()
+
         def _on_max_duration() -> None:
             """Called from timer thread when max duration reached."""
-            loop = asyncio.get_event_loop()
             asyncio.run_coroutine_threadsafe(self._stop_recording(), loop)
 
         if self._config.streaming.enabled and self._vad is not None:
@@ -94,8 +96,9 @@ class YapperDaemon:
 
     async def _start_streaming(self, on_max_duration) -> str:
         """Start recording in streaming mode with VAD segmentation."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         self._vad.reset()
+        self._stop_event.clear()
 
         # Drain any stale items from queue
         while not self._segment_queue.empty():
@@ -117,14 +120,16 @@ class YapperDaemon:
 
     async def _segment_worker(self) -> None:
         """Pull speech segments from queue, transcribe, and inject."""
-        loop = asyncio.get_event_loop()
-        context = await get_active_window()
+        loop = asyncio.get_running_loop()
         skip_llm = self._config.streaming.skip_llm
 
-        while True:
-            segment = await self._segment_queue.get()
-            if segment is None:
-                break
+        while not self._stop_event.is_set():
+            try:
+                segment = await asyncio.wait_for(self._segment_queue.get(), timeout=0.5)
+            except asyncio.TimeoutError:
+                continue
+
+            context = await get_active_window()
 
             duration = len(segment) / self._config.audio.sample_rate
             log.info("Streaming: transcribing %.2fs segment", duration)
@@ -193,10 +198,7 @@ class YapperDaemon:
                     log.warning("Segment queue full, dropping final segment")
 
         # Signal worker to stop
-        try:
-            self._segment_queue.put_nowait(None)
-        except asyncio.QueueFull:
-            pass
+        self._stop_event.set()
 
         # Wait for worker to drain
         if self._segment_worker_task is not None:
@@ -232,7 +234,7 @@ class YapperDaemon:
         log.info("Transcribing %.1fs of audio...", duration)
 
         # Transcribe (CPU-bound, run in executor) with timeout
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         transcription_timeout = max(10.0, duration * 3)
         try:
             text = await asyncio.wait_for(
@@ -269,12 +271,12 @@ class YapperDaemon:
         await self._server.stop()
         await self._processor.close()
         # Stop the event loop
-        asyncio.get_event_loop().stop()
+        asyncio.get_running_loop().stop()
 
     async def run(self) -> None:
         """Start the daemon."""
         # Set up signal handlers
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, lambda: asyncio.ensure_future(self._shutdown()))
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -45,5 +46,5 @@ class Dictionary:
             return text
 
         for src, dst in self._subs.items():
-            text = text.replace(src, dst)
+            text = re.sub(r'\b' + re.escape(src) + r'\b', dst, text)
         return text

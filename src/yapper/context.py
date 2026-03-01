@@ -70,12 +70,15 @@ async def get_active_window() -> WindowContext:
         title = data.get("title", "")
         is_xwayland = data.get("xwayland", False)
 
-        # Determine mode from app class
-        mode = "prose"
-        for pattern, m in _APP_MODES.items():
-            if pattern in app_class:
-                mode = m
-                break
+        # Determine mode from app class (exact match first, then substring)
+        mode = _APP_MODES.get(app_class, "")
+        if not mode:
+            for pattern, m in _APP_MODES.items():
+                if pattern in app_class:
+                    mode = m
+                    break
+            else:
+                mode = "prose"
 
         ctx = WindowContext(
             app_class=app_class,

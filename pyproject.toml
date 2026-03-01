@@ -8,12 +8,14 @@ dependencies = [
     "numpy>=2.0",
     "faster-whisper>=1.1",
     "httpx>=0.28",
-    "tomli>=2.0; python_version < '3.11'",
 ]
 
 [project.scripts]
 yapper = "yapper.main:main"
 yapper-ctl = "yapper_ctl.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
 
 [build-system]
 requires = ["hatchling"]

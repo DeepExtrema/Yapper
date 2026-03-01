@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -14,11 +15,14 @@ log = logging.getLogger(__name__)
 
 # Lazy-loaded to avoid slow import at startup
 _model = None
+_model_lock = threading.Lock()
 
 
 def _get_model(config: TranscriberConfig):
     global _model
-    if _model is None:
+    with _model_lock:
+        if _model is not None:
+            return _model
         from faster_whisper import WhisperModel
 
         log.info(
@@ -34,7 +38,7 @@ def _get_model(config: TranscriberConfig):
             cpu_threads=config.cpu_threads,
         )
         log.info("Whisper model loaded")
-    return _model
+        return _model
 
 
 class Transcriber:
