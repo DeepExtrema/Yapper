@@ -1,0 +1,19 @@
+[Unit]
+Description=llama-server for Yapper LLM post-processing
+After=network.target
+
+[Service]
+Type=simple
+# Download model first: huggingface-cli download Qwen/Qwen3-0.6B-GGUF qwen3-0.6b-q4_k_m.gguf --local-dir ~/.local/share/yapper/models
+ExecStart=llama-server \
+    --model %h/.local/share/yapper/models/qwen3-0.6b-q4_k_m.gguf \
+    --host 127.0.0.1 \
+    --port 8080 \
+    --threads 4 \
+    --ctx-size 2048 \
+    --batch-size 512
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

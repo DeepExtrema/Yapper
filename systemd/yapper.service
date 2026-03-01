@@ -1,0 +1,14 @@
+[Unit]
+Description=Yapper voice dictation daemon
+After=graphical-session.target pipewire.service
+Requires=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/yapper
+Restart=on-failure
+RestartSec=3
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+
+[Install]
+WantedBy=default.target
