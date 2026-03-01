@@ -1,6 +1,16 @@
 """Tests for context window mode detection."""
 
-from yapper.context import _APP_MODES, WindowContext, resolve_mode
+import asyncio
+from unittest.mock import AsyncMock, patch
+
+from yapper.context import (
+    _APP_MODES,
+    WindowContext,
+    _get_window_hyprland,
+    _get_window_x11,
+    get_active_window,
+    resolve_mode,
+)
 
 
 def test_exact_match_code_editors():
@@ -41,3 +51,53 @@ def test_unknown_app_defaults_to_prose():
 def test_default_window_context_mode():
     ctx = WindowContext()
     assert ctx.mode == "prose"
+
+
+def test_x11_fallback_xdotool():
+    """When Hyprland backend fails, X11 backend should be used."""
+
+    async def _run():
+        with (
+            patch(
+                "yapper.context._get_window_hyprland",
+                new_callable=AsyncMock,
+                side_effect=FileNotFoundError("hyprctl not found"),
+            ),
+            patch(
+                "yapper.context._get_window_x11",
+                new_callable=AsyncMock,
+                return_value=("firefox", "Mozilla Firefox", True),
+            ),
+        ):
+            ctx = await get_active_window()
+            assert ctx.app_class == "firefox"
+            assert ctx.title == "Mozilla Firefox"
+            assert ctx.is_xwayland is True
+            assert ctx.mode == "prose"
+
+    asyncio.run(_run())
+
+
+def test_fallback_returns_default():
+    """When all backends fail, a default WindowContext is returned."""
+
+    async def _run():
+        with (
+            patch(
+                "yapper.context._get_window_hyprland",
+                new_callable=AsyncMock,
+                side_effect=FileNotFoundError("hyprctl not found"),
+            ),
+            patch(
+                "yapper.context._get_window_x11",
+                new_callable=AsyncMock,
+                side_effect=FileNotFoundError("xdotool not found"),
+            ),
+        ):
+            ctx = await get_active_window()
+            assert ctx.app_class == ""
+            assert ctx.title == ""
+            assert ctx.is_xwayland is False
+            assert ctx.mode == "prose"
+
+    asyncio.run(_run())
