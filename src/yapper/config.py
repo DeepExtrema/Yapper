@@ -84,6 +84,11 @@ class StreamingConfig:
 
 
 @dataclass
+class FormatterConfig:
+    enabled: bool = True
+
+
+@dataclass
 class Config:
     audio: AudioConfig = field(default_factory=AudioConfig)
     transcriber: TranscriberConfig = field(default_factory=TranscriberConfig)
@@ -93,6 +98,7 @@ class Config:
     daemon: DaemonConfig = field(default_factory=DaemonConfig)
     dictionary: DictionaryConfig = field(default_factory=DictionaryConfig)
     streaming: StreamingConfig = field(default_factory=StreamingConfig)
+    formatter: FormatterConfig = field(default_factory=FormatterConfig)
 
     @property
     def socket_path(self) -> Path:
@@ -110,7 +116,8 @@ def _apply_dict(obj: object, data: dict) -> None:
         current = getattr(obj, key)
         if isinstance(current, (AudioConfig, TranscriberConfig, ProcessorConfig,
                                 InjectorConfig, NotificationConfig, DaemonConfig,
-                                DictionaryConfig, StreamingConfig)) and isinstance(value, dict):
+                                DictionaryConfig, StreamingConfig,
+                                FormatterConfig)) and isinstance(value, dict):
             _apply_dict(current, value)
         else:
             setattr(obj, key, value)
