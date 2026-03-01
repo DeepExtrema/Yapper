@@ -43,9 +43,12 @@ log_level = "INFO"
 enabled = false
 # path = ""  # empty = ~/.config/yapper/dictionary.txt
 
+[formatter]
+enabled = true
+
 [streaming]
 enabled = true
-silence_duration_ms = 700    # silence gap to end a speech segment
+silence_duration_ms = 500    # silence gap to end a speech segment
 min_speech_duration_ms = 250 # discard speech shorter than this
 speech_threshold = 0.5       # VAD probability threshold
 speech_pad_ms = 100          # padding around speech segments
