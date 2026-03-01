@@ -123,10 +123,14 @@ class YapperDaemon:
         loop = asyncio.get_running_loop()
         skip_llm = self._config.streaming.skip_llm
 
-        while not self._stop_event.is_set():
+        while True:
+            if self._stop_event.is_set() and self._segment_queue.empty():
+                break
             try:
                 segment = await asyncio.wait_for(self._segment_queue.get(), timeout=0.5)
             except asyncio.TimeoutError:
+                if self._stop_event.is_set():
+                    break
                 continue
 
             context = await get_active_window()

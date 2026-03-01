@@ -19,7 +19,7 @@ class Dictionary:
 
     def __init__(self, path: str = "", enabled: bool = False) -> None:
         self._enabled = enabled
-        self._subs: dict[str, str] = {}
+        self._patterns: list[tuple[re.Pattern, str]] = []
 
         if not enabled:
             return
@@ -36,15 +36,16 @@ class Dictionary:
                 continue
             if " -> " in line:
                 src, dst = line.split(" -> ", 1)
-                self._subs[src.strip()] = dst.strip()
+                pattern = re.compile(r'\b' + re.escape(src.strip()) + r'\b')
+                self._patterns.append((pattern, dst.strip()))
                 count += 1
         log.info("Loaded %d dictionary entries from %s", count, path)
 
     def apply(self, text: str) -> str:
         """Apply dictionary substitutions to text."""
-        if not self._enabled or not self._subs:
+        if not self._enabled or not self._patterns:
             return text
 
-        for src, dst in self._subs.items():
-            text = re.sub(r'\b' + re.escape(src) + r'\b', dst, text)
+        for pattern, dst in self._patterns:
+            text = pattern.sub(dst, text)
         return text

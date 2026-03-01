@@ -39,12 +39,13 @@ class AudioRecorder:
         if status:
             log.warning("Audio callback status: %s", status)
         cb = None
+        chunk = None
         with self._lock:
             if self._recording:
                 chunk = indata.copy()
                 self._chunks.append(chunk)
                 cb = self._on_chunk
-        if cb is not None:
+        if cb is not None and chunk is not None:
             cb(chunk)
 
     def start(

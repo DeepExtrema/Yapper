@@ -51,6 +51,17 @@ class WindowContext:
     mode: str = "prose"  # default mode
 
 
+def resolve_mode(app_class: str) -> str:
+    """Resolve dictation mode from app class (exact match first, then substring)."""
+    mode = _APP_MODES.get(app_class, "")
+    if mode:
+        return mode
+    for pattern, m in _APP_MODES.items():
+        if pattern in app_class:
+            return m
+    return "prose"
+
+
 async def get_active_window() -> WindowContext:
     """Get the currently focused window info from Hyprland."""
     try:
@@ -70,15 +81,7 @@ async def get_active_window() -> WindowContext:
         title = data.get("title", "")
         is_xwayland = data.get("xwayland", False)
 
-        # Determine mode from app class (exact match first, then substring)
-        mode = _APP_MODES.get(app_class, "")
-        if not mode:
-            for pattern, m in _APP_MODES.items():
-                if pattern in app_class:
-                    mode = m
-                    break
-            else:
-                mode = "prose"
+        mode = resolve_mode(app_class)
 
         ctx = WindowContext(
             app_class=app_class,

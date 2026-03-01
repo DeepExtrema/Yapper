@@ -43,14 +43,23 @@ def main() -> None:
     args = sys.argv[1:]
     socket_override = None
 
-    # Parse --socket flag
-    if "--socket" in args:
-        idx = args.index("--socket")
-        if idx + 1 >= len(args):
-            print("Error: --socket requires a path argument", file=sys.stderr)
-            sys.exit(1)
-        socket_override = args[idx + 1]
-        args = args[:idx] + args[idx + 2:]
+    # Parse --socket flag (supports --socket PATH and --socket=PATH)
+    filtered = []
+    i = 0
+    while i < len(args):
+        if args[i] == "--socket":
+            if i + 1 >= len(args):
+                print("Error: --socket requires a path argument", file=sys.stderr)
+                sys.exit(1)
+            socket_override = args[i + 1]
+            i += 2
+        elif args[i].startswith("--socket="):
+            socket_override = args[i].split("=", 1)[1]
+            i += 1
+        else:
+            filtered.append(args[i])
+            i += 1
+    args = filtered
 
     # Also check YAPPER_SOCKET env var
     if socket_override is None:

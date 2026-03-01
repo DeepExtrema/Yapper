@@ -9,7 +9,7 @@ from yapper.injector import Injector
 
 def _make_injector(has_wtype=True, has_ydotool=True, has_wl_copy=True, **kwargs):
     config = InjectorConfig(**kwargs)
-    with patch("shutil.which") as mock_which:
+    with patch("yapper.injector.shutil.which") as mock_which:
         def side_effect(tool):
             return {
                 "wtype": "/usr/bin/wtype" if has_wtype else None,

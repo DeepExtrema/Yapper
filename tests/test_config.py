@@ -1,6 +1,5 @@
 """Tests for config loading and merging."""
 
-import tempfile
 from pathlib import Path
 
 from yapper.config import Config, _apply_dict, load_config
@@ -47,11 +46,10 @@ def test_load_config_missing_file():
     assert config.audio.sample_rate == 16000  # defaults
 
 
-def test_load_config_from_file():
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
-        f.write('[audio]\nsample_rate = 48000\n[transcriber]\nmodel = "tiny.en"\n')
-        f.flush()
-        config = load_config(Path(f.name))
+def test_load_config_from_file(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text('[audio]\nsample_rate = 48000\n[transcriber]\nmodel = "tiny.en"\n')
+    config = load_config(p)
 
     assert config.audio.sample_rate == 48000
     assert config.transcriber.model == "tiny.en"
