@@ -15,16 +15,19 @@ log = logging.getLogger(__name__)
 
 
 class Injector:
-    """Inject text into the focused window using wtype, ydotool, or clipboard."""
+    """Inject text into the focused window using wtype, ydotool, xdotool, or clipboard."""
 
     def __init__(self, config: InjectorConfig) -> None:
         self._config = config
         self._has_wtype = shutil.which("wtype") is not None
         self._has_ydotool = shutil.which("ydotool") is not None
+        self._has_xdotool = shutil.which("xdotool") is not None
         self._has_wl_copy = shutil.which("wl-copy") is not None
+        self._has_xclip = shutil.which("xclip") is not None
         log.info(
-            "Injection tools: wtype=%s ydotool=%s wl-copy=%s",
-            self._has_wtype, self._has_ydotool, self._has_wl_copy,
+            "Injection tools: wtype=%s ydotool=%s xdotool=%s wl-copy=%s xclip=%s",
+            self._has_wtype, self._has_ydotool, self._has_xdotool,
+            self._has_wl_copy, self._has_xclip,
         )
 
     async def inject(self, text: str, context: WindowContext) -> None:
@@ -44,13 +47,16 @@ class Injector:
         if method == "clipboard":
             await self._inject_clipboard(text, context)
         elif method == "ydotool":
-            await asyncio.sleep(0.3)
             ok = await self._inject_ydotool(text)
             if not ok:
                 log.warning("ydotool failed, falling back to clipboard paste")
                 await self._inject_clipboard(text, context)
+        elif method == "xdotool":
+            ok = await self._inject_xdotool(text)
+            if not ok:
+                log.warning("xdotool failed, falling back to clipboard paste")
+                await self._inject_clipboard(text, context)
         else:
-            await asyncio.sleep(0.3)
             ok = await self._inject_wtype(text)
             if not ok:
                 log.warning("wtype failed, falling back to clipboard paste")
@@ -60,6 +66,8 @@ class Injector:
         if context.is_xwayland:
             if self._has_ydotool:
                 return "ydotool"
+            if self._has_xdotool:
+                return "xdotool"
             return "clipboard"
         if len(text) > self._config.clipboard_threshold:
             return "clipboard"
@@ -67,6 +75,8 @@ class Injector:
             return "wtype"
         if self._has_ydotool:
             return "ydotool"
+        if self._has_xdotool:
+            return "xdotool"
         return "clipboard"
 
     async def _inject_wtype(self, text: str) -> bool:
@@ -79,20 +89,34 @@ class Injector:
     async def _inject_ydotool(self, text: str) -> bool:
         return await self._run(["ydotool", "type", "--", text])
 
+    async def _inject_xdotool(self, text: str) -> bool:
+        return await self._run(["xdotool", "type", "--clearmodifiers", "--", text])
+
     async def _copy_to_clipboard(self, text: str) -> None:
         """Copy text to clipboard (used as fallback for all methods)."""
-        if not self._has_wl_copy:
-            log.warning("wl-copy not found, cannot copy to clipboard")
-            return
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "wl-copy", "--", text,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            await asyncio.wait_for(proc.communicate(), timeout=2.0)
-        except (asyncio.TimeoutError, FileNotFoundError) as e:
-            log.warning("Failed to copy to clipboard: %s", e)
+        if self._has_wl_copy:
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "wl-copy", "--", text,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await asyncio.wait_for(proc.communicate(), timeout=2.0)
+                return
+            except (asyncio.TimeoutError, FileNotFoundError) as e:
+                log.warning("Failed to copy to clipboard via wl-copy: %s", e)
+        if self._has_xclip:
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "xclip", "-selection", "clipboard",
+                    stdin=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await asyncio.wait_for(proc.communicate(input=text.encode()), timeout=2.0)
+                return
+            except (asyncio.TimeoutError, FileNotFoundError) as e:
+                log.warning("Failed to copy to clipboard via xclip: %s", e)
+        log.warning("No clipboard tool found (wl-copy or xclip), cannot copy to clipboard")
 
     async def _inject_clipboard(self, text: str, context: WindowContext) -> None:
         await asyncio.sleep(self._config.clipboard_paste_delay)
