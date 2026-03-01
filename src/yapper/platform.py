@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -57,9 +58,18 @@ def detect_gpu() -> str:
     return "cpu"
 
 
+_SAFE_PACKAGE_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._+\-]*$")
+
+
 def suggest_install_cmd(package_manager: str, packages: list[str]) -> str | None:
-    """Return an install command string, or None if the manager is unknown."""
+    """Return an install command string, or None if the manager is unknown.
+
+    Package names are validated to contain only safe characters.
+    """
     prefix = _INSTALL_COMMANDS.get(package_manager)
     if prefix is None:
         return None
+    for pkg in packages:
+        if not _SAFE_PACKAGE_RE.match(pkg):
+            return None
     return f"{prefix} {' '.join(packages)}"

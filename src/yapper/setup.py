@@ -190,15 +190,12 @@ def _step_model(step: int, total: int, gpu: str) -> dict:
     if gpu in ("cuda", "rocm"):
         print(f"\n  GPU detected: {_bold(gpu)}")
         if _confirm("Enable GPU acceleration?", default=True):
-            device = gpu if gpu == "cuda" else "cpu"
+            device = "cuda"  # CTranslate2 uses 'cuda' for both CUDA and ROCm/HIP
+            compute_type = "float16"
             if gpu == "rocm":
-                # ROCm uses CTranslate2 with CPU fallback currently
-                print(_yellow("  Note: ROCm support depends on your CTranslate2 build."))
-                print(_dim("  Falling back to CPU if ROCm is unavailable at runtime."))
-                device = "cpu"
-            else:
-                compute_type = "float16"
-                print(f"  {_green('✓')} GPU acceleration enabled ({device}, {compute_type})")
+                print(_yellow("  Note: ROCm support requires CTranslate2 built with HIP."))
+                print(_dim("  If transcription fails, re-run setup and choose CPU."))
+            print(f"  {_green('✓')} GPU acceleration enabled (device=cuda, {compute_type})")
         else:
             print(f"  {_dim('Using CPU (int8)')}")
     else:

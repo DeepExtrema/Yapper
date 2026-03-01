@@ -121,8 +121,13 @@ class Injector:
     async def _inject_clipboard(self, text: str, context: WindowContext) -> None:
         await asyncio.sleep(self._config.clipboard_paste_delay)
 
-        if context.is_xwayland:
-            await self._run(["ydotool", "key", "29:1", "47:1", "47:0", "29:0"])
+        if context.is_xwayland or not self._has_wtype:
+            if self._has_ydotool:
+                await self._run(["ydotool", "key", "29:1", "47:1", "47:0", "29:0"])
+            elif self._has_xdotool:
+                await self._run(["xdotool", "key", "--clearmodifiers", "ctrl+v"])
+            else:
+                log.warning("No tool available to paste from clipboard")
         else:
             await self._run(["wtype", "-M", "ctrl", "-P", "v", "-p", "v", "-m", "ctrl"])
 
