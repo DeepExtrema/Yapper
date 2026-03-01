@@ -1,0 +1,65 @@
+"""Platform detection utilities for cross-desktop support."""
+
+from __future__ import annotations
+
+import os
+import shutil
+from pathlib import Path
+
+_KNOWN_DESKTOPS = {"hyprland", "gnome", "cinnamon", "kde", "sway"}
+
+_INSTALL_COMMANDS: dict[str, str] = {
+    "pacman": "sudo pacman -S",
+    "apt": "sudo apt install",
+    "dnf": "sudo dnf install",
+    "zypper": "sudo zypper install",
+}
+
+
+def detect_desktop() -> str:
+    """Detect the current desktop environment via $XDG_CURRENT_DESKTOP.
+
+    Returns one of: hyprland, gnome, cinnamon, kde, sway, unknown.
+    """
+    raw = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+
+    # Handle X-Cinnamon → cinnamon
+    normalised = raw.removeprefix("x-")
+
+    if normalised in _KNOWN_DESKTOPS:
+        return normalised
+    return "unknown"
+
+
+def detect_display_server() -> str:
+    """Detect whether running under Wayland, X11, or unknown."""
+    if os.environ.get("WAYLAND_DISPLAY"):
+        return "wayland"
+    if os.environ.get("DISPLAY"):
+        return "x11"
+    return "unknown"
+
+
+def detect_package_manager() -> str:
+    """Detect the system package manager (pacman, apt, dnf, zypper, or unknown)."""
+    for pm in ("pacman", "apt", "dnf", "zypper"):
+        if shutil.which(pm):
+            return pm
+    return "unknown"
+
+
+def detect_gpu() -> str:
+    """Detect GPU acceleration: cuda, rocm, or cpu."""
+    if shutil.which("nvidia-smi"):
+        return "cuda"
+    if shutil.which("rocm-smi") or Path("/opt/rocm").is_dir():
+        return "rocm"
+    return "cpu"
+
+
+def suggest_install_cmd(package_manager: str, packages: list[str]) -> str | None:
+    """Return an install command string, or None if the manager is unknown."""
+    prefix = _INSTALL_COMMANDS.get(package_manager)
+    if prefix is None:
+        return None
+    return f"{prefix} {' '.join(packages)}"
