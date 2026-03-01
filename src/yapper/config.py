@@ -76,7 +76,7 @@ class DictionaryConfig:
 @dataclass
 class StreamingConfig:
     enabled: bool = True
-    silence_duration_ms: int = 700
+    silence_duration_ms: int = 500
     min_speech_duration_ms: int = 250
     speech_threshold: float = 0.5
     speech_pad_ms: int = 100

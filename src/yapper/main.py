@@ -6,6 +6,7 @@ import asyncio
 import logging
 import signal
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
@@ -17,6 +18,7 @@ from yapper.hotkey import HotkeyServer
 from yapper.injector import Injector
 from yapper.notifications import Notifier
 from yapper.processor import Processor
+from yapper.formatter import format_text
 from yapper.transcriber import Transcriber
 
 log = logging.getLogger("yapper")
@@ -37,6 +39,7 @@ class YapperDaemon:
             enabled=self._config.dictionary.enabled,
         )
         self._server = HotkeyServer(self._config.socket_path, self._handle_command)
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="whisper")
         self._processing = False
         self._last_command_time: float = 0
 
@@ -142,7 +145,7 @@ class YapperDaemon:
             try:
                 text = await asyncio.wait_for(
                     loop.run_in_executor(
-                        None, self._transcriber.transcribe, segment
+                        self._executor, self._transcriber.transcribe, segment
                     ),
                     timeout=transcription_timeout,
                 )
@@ -154,6 +157,9 @@ class YapperDaemon:
                 continue
 
             text = self._dictionary.apply(text)
+
+            if self._config.formatter.enabled:
+                text = format_text(text)
 
             if not skip_llm:
                 text = await self._processor.process(text, context)
@@ -243,7 +249,7 @@ class YapperDaemon:
         try:
             text = await asyncio.wait_for(
                 loop.run_in_executor(
-                    None, self._transcriber.transcribe, audio
+                    self._executor, self._transcriber.transcribe, audio
                 ),
                 timeout=transcription_timeout,
             )
@@ -258,6 +264,9 @@ class YapperDaemon:
 
         # Apply dictionary substitutions
         text = self._dictionary.apply(text)
+
+        if self._config.formatter.enabled:
+            text = format_text(text)
 
         # LLM post-processing
         text = await self._processor.process(text, context)
@@ -274,6 +283,7 @@ class YapperDaemon:
             self._segment_worker_task.cancel()
         await self._server.stop()
         await self._processor.close()
+        self._executor.shutdown(wait=False)
         # Stop the event loop
         asyncio.get_running_loop().stop()
 
@@ -286,7 +296,7 @@ class YapperDaemon:
 
         # Pre-load whisper model
         log.info("Loading transcription model...")
-        await loop.run_in_executor(None, self._transcriber.load_model)
+        await loop.run_in_executor(self._executor, self._transcriber.load_model)
         log.info("Model loaded")
 
         # Load VAD model if streaming enabled
@@ -315,6 +325,12 @@ class YapperDaemon:
 
 def main() -> None:
     """Entry point for the yapper daemon."""
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "setup":
+        from yapper.setup import run_setup
+        run_setup()
+        return
+
     config = load_config()
 
     logging.basicConfig(
