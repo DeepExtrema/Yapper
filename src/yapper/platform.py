@@ -24,11 +24,12 @@ def detect_desktop() -> str:
     """
     raw = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
 
-    # Handle X-Cinnamon → cinnamon
-    normalised = raw.removeprefix("x-")
-
-    if normalised in _KNOWN_DESKTOPS:
-        return normalised
+    # XDG_CURRENT_DESKTOP can be colon-separated (e.g. "ubuntu:GNOME")
+    for token in raw.split(":"):
+        # Handle X-Cinnamon → cinnamon
+        normalised = token.strip().removeprefix("x-")
+        if normalised in _KNOWN_DESKTOPS:
+            return normalised
     return "unknown"
 
 

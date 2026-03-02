@@ -39,6 +39,16 @@ def test_detect_desktop_sway():
     assert detect_desktop() == "sway"
 
 
+@patch.dict("os.environ", {"XDG_CURRENT_DESKTOP": "ubuntu:GNOME"}, clear=False)
+def test_detect_desktop_colon_separated():
+    assert detect_desktop() == "gnome"
+
+
+@patch.dict("os.environ", {"XDG_CURRENT_DESKTOP": "pop:GNOME"}, clear=False)
+def test_detect_desktop_colon_separated_pop():
+    assert detect_desktop() == "gnome"
+
+
 @patch.dict("os.environ", {"XDG_CURRENT_DESKTOP": "SomethingElse"}, clear=False)
 def test_detect_desktop_unknown():
     assert detect_desktop() == "unknown"
@@ -169,4 +179,9 @@ def test_suggest_install_cmd_zypper():
 
 def test_suggest_install_cmd_unknown():
     result = suggest_install_cmd("unknown", ["python3"])
+    assert result is None
+
+
+def test_suggest_install_cmd_rejects_unsafe_package():
+    result = suggest_install_cmd("pacman", ["python; rm -rf /"])
     assert result is None
