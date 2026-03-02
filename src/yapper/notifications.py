@@ -34,6 +34,7 @@ class Notifier:
             f"--expire-time={self._config.timeout}",
             f"--urgency={urgency}",
             f"--hint=string:x-canonical-private-synchronous:{replace_id}",
+            "--",
             summary,
         ]
         if body:

@@ -286,8 +286,11 @@ def _keybind_hyprland() -> dict:
             print(f"  Detected mouse button: {_bold(bind_key)}")
     elif choice == 3:
         raw = input("  Enter key name (e.g. Insert, F12, XF86Launch1): ").strip()
-        if raw:
+        if raw and re.match(r"^[a-zA-Z0-9_]+$", raw):
             bind_key = raw
+        elif raw:
+            print(_red("  Invalid key name (alphanumeric and underscores only). Using default (Insert)."))
+
 
     # Determine yapper-ctl path
     ctl = shutil.which("yapper-ctl") or "yapper-ctl"

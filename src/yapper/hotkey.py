@@ -21,7 +21,12 @@ class HotkeyServer:
         self._server: asyncio.AbstractServer | None = None
 
     async def start(self) -> None:
-        # Clean up stale socket
+        # Refuse to overwrite non-socket files to prevent accidental file deletion
+        if self._socket_path.exists() and not self._socket_path.is_socket():
+            raise RuntimeError(
+                f"Socket path {self._socket_path} exists and is not a socket, "
+                "refusing to overwrite. Check daemon.socket_path in your config."
+            )
         self._socket_path.unlink(missing_ok=True)
         self._socket_path.parent.mkdir(parents=True, exist_ok=True)
 
